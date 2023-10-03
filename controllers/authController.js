@@ -1,6 +1,7 @@
 const User = require("../models/userModel");
 const bcrypt = require("bcrypt");
 const helper = require("../utils/helper");
+const Subscription = require("../models/subscriptionModel");
 
 class AuthController {
   signup = async (req, res, next) => {
@@ -16,6 +17,7 @@ class AuthController {
         email: body.email,
         password: hashedPassword,
         status: "false",
+        subscriptionId: body.subId || 1,
       });
 
       const result = await user.save();
@@ -139,11 +141,9 @@ class AuthController {
 
       helper.sendVerificationEmail(mailOptions);
 
-      res
-        .status(200)
-        .json({
-          message: "Request for reset password has been sent to your mail",
-        });
+      res.status(200).json({
+        message: "Request for reset password has been sent to your mail",
+      });
     } catch (err) {
       if (!err.statusCode) {
         err.statusCode = 500;
@@ -158,8 +158,7 @@ class AuthController {
     try {
       helper.validateRequest(req);
 
-      const user = await User.findOne({where: {id: userId}});
-
+      const user = await User.findOne({ where: { id: userId } });
 
       if (!user.resetToken) {
         const error = new Error("Your Password has been changed already!");
@@ -174,7 +173,30 @@ class AuthController {
 
       const result = await user.save();
 
-      res.status(200).json({message: "Your password changed successfully"});
+      res.status(200).json({ message: "Your password changed successfully" });
+    } catch (err) {
+      if (!err.statusCode) {
+        err.statusCode = 500;
+      }
+      next(err);
+    }
+  };
+
+  addSubscriptionPlan = async (req, res, next) => {
+    const body = req.body;
+
+    try {
+      const subPlan = new Subscription({
+        plan_name: body.name,
+        posts_limit: body.postLimit,
+        collab_limit: body.collabLimit,
+      });
+
+      const result = await subPlan.save();
+
+      res
+        .status(201)
+        .json({ message: "Subscription plan Created.", data: result });
     } catch (err) {
       if (!err.statusCode) {
         err.statusCode = 500;

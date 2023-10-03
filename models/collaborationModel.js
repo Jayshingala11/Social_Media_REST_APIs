@@ -2,8 +2,8 @@ const Sequelize = require("sequelize");
 
 const sequelize = require("../utils/database");
 
-const User = sequelize.define(
-  "user",
+const Collaboration = sequelize.define(
+  "collaboration",
   {
     id: {
       type: Sequelize.INTEGER,
@@ -11,24 +11,13 @@ const User = sequelize.define(
       allowNull: false,
       primaryKey: true,
     },
-    name: {
+    collab_content: {
       type: Sequelize.STRING,
       allowNull: false,
-    },
-    email: {
-      type: Sequelize.STRING,
-      allowNull: false,
-    },
-    password: {
-      type: Sequelize.STRING,
-      allowNull: false,
-    },
-    resetToken: {
-      type: Sequelize.STRING,
     },
     status: {
-      type: Sequelize.STRING,
-      allowNull: false,
+      type: Sequelize.BOOLEAN,
+      defaultValue: false,
     },
   },
   {
@@ -36,4 +25,4 @@ const User = sequelize.define(
   }
 );
 
-module.exports = User;
+module.exports = Collaboration;

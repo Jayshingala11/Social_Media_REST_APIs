@@ -1,9 +1,10 @@
-const Sequelize = require('sequelize');
+const Sequelize = require("sequelize");
 
-const sequelize = new Sequelize("final-project", 'root', 'jay@3011', {
-    dialect: "mysql",
-    host: "localhost",
-    timezone: '+05:30',
+const sequelize = new Sequelize("final-project", "root", "jay@3011", {
+  dialect: "mysql",
+  host: "localhost",
+  timezone: "+05:30",
+  logging: false,
 });
 
 module.exports = sequelize;

@@ -72,4 +72,6 @@ router.post(
   authController.setnewPassword
 );
 
+router.post("/addSubscriptionPlan", authController.addSubscriptionPlan);
+
 module.exports = router;

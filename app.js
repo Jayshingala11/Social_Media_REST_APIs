@@ -6,6 +6,8 @@ const User = require("./models/userModel");
 const Post = require("./models/postModel");
 const Like = require("./models/likeModel");
 const Comment = require("./models/commentModel");
+const Subscription = require("./models/subscriptionModel");
+const Collaboration = require("./models/collaborationModel");
 
 const app = express();
 
@@ -53,6 +55,11 @@ Comment.belongsTo(Post, { constraints: true, onDelete: "CASCADE" });
 Post.hasMany(Comment, { paranoid: true });
 Comment.belongsTo(User, { constraints: true, onDelete: "CASCADE" });
 User.hasMany(Comment);
+User.belongsTo(Subscription);
+Collaboration.belongsTo(User, { constraints: true, onDelete: "CASCADE" });
+User.hasMany(Collaboration);
+Collaboration.belongsTo(Post, { constraints: true, onDelete: "CASCADE" });
+Post.hasMany(Collaboration);
 
 // Server Running
 sequelize
