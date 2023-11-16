@@ -1,14 +1,17 @@
-const User = require("../models/userModel");
 const bcrypt = require("bcrypt");
 const helper = require("../utils/helper");
-const Subscription = require("../models/subscriptionModel");
+const models = require("../models/indexModel");
+const User = models.userModel;
+const Subscription = models.subscriptionModel;
+const Interest = models.interestModel;
+
+const { Op } = require("sequelize");
 
 class AuthController {
   signup = async (req, res, next) => {
-    const body = req.body;
-
     try {
       helper.validateRequest(req);
+      const body = req.body;
 
       const hashedPassword = await bcrypt.hash(body.password, 12);
 
@@ -46,10 +49,10 @@ class AuthController {
     }
   };
 
-  verifyEmial = async (req, res, next) => {
-    const email = req.data;
+  verifyEmail = async (req, res, next) => {
+    const email = req.user.email;
     try {
-      const user = await User.findOne({ where: { email: email } });
+      const user = await User.findOne({ where: { email } });
 
       if (user.status === "true") {
         const error = new Error("Your email already verified");
@@ -59,7 +62,7 @@ class AuthController {
 
       user.status = "true";
 
-      const result = await user.save();
+      await user.save();
 
       res.status(200).json({ message: "Your email verified successfully." });
     } catch (err) {
@@ -101,7 +104,9 @@ class AuthController {
 
       const token = await helper.generateToken(userObj, "1h");
 
-      res.status(200).json({ message: "Successfully logged In", token: token });
+      res
+        .status(200)
+        .json({ message: "Successfully logged In", token: `Bearer ${token}` });
     } catch (err) {
       if (!err.statusCode) {
         err.statusCode = 500;
@@ -128,7 +133,7 @@ class AuthController {
 
       user.resetToken = token;
 
-      const result = await user.save();
+      await user.save();
 
       const mailOptions = {
         from: "jayshingalabackup@gmail.com",
@@ -153,7 +158,7 @@ class AuthController {
   };
 
   setnewPassword = async (req, res, next) => {
-    const userId = req.data;
+    const userId = req.user.id;
     const newPassword = req.body.newPassword;
     try {
       helper.validateRequest(req);
@@ -171,7 +176,7 @@ class AuthController {
       user.password = hashedPassword;
       user.resetToken = null;
 
-      const result = await user.save();
+      await user.save();
 
       res.status(200).json({ message: "Your password changed successfully" });
     } catch (err) {

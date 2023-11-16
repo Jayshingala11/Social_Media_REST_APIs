@@ -35,4 +35,11 @@ const Post = sequelize.define(
   }
 );
 
+Post.associate = (models) => {
+  Post.belongsTo(models.userModel);
+  Post.hasMany(models.likeModel, { onDelete: "CASCADE" });
+  Post.hasMany(models.commentModel, { onDelete: "CASCADE" });
+  Post.hasMany(models.collaborationModel, { onDelete: "CASCADE" });
+};
+
 module.exports = Post;

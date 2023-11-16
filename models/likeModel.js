@@ -21,4 +21,9 @@ const Like = sequelize.define(
   }
 );
 
+Like.associate = (models) => {
+  Like.belongsTo(models.postModel, { onDelete: "CASCADE" });
+  Like.belongsTo(models.userModel);
+};
+
 module.exports = Like;

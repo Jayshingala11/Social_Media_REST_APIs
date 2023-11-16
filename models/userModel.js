@@ -1,6 +1,7 @@
 const Sequelize = require("sequelize");
 
 const sequelize = require("../utils/database");
+const models = require("./indexModel");
 
 const User = sequelize.define(
   "user",
@@ -35,5 +36,13 @@ const User = sequelize.define(
     paranoid: true,
   }
 );
+
+User.associate = (models) => {
+  User.hasMany(models.postModel, { onDelete: "CASCADE" });
+  User.hasMany(models.likeModel, { onDelete: "CASCADE" });
+  User.hasMany(models.commentModel, { onDelete: "CASCADE" });
+  User.hasMany(models.collaborationModel, { onDelete: "CASCADE" });
+  User.belongsTo(models.subscriptionModel);
+};
 
 module.exports = User;

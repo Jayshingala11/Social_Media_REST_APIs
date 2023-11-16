@@ -10,13 +10,14 @@ const Collaboration = require("../models/collaborationModel");
 
 class UserController {
   createPost = async (req, res, next) => {
-    const body = req.body;
-    const data = req.data;
+    const userId = req.user.id;
     try {
       helper.validateRequest(req);
 
+      const { title, description, editable, draft } = req.body;
+
       const user = await User.findOne({
-        where: { id: data.id },
+        where: { id: userId },
         include: Subscription,
       });
 
@@ -25,7 +26,7 @@ class UserController {
 
       if (userPlan === "Basic") {
         const { count } = await Post.findAndCountAll({
-          where: { userId: data.id },
+          where: { userId },
         });
 
         if (count >= maxPostsLimit) {
@@ -47,7 +48,7 @@ class UserController {
 
       const userPostCount = await Post.findAndCountAll({
         where: {
-          userId: data.id,
+          userId,
           createdAt: { [Op.between]: [monthStarting, monthEnding] },
         },
       });
@@ -59,10 +60,10 @@ class UserController {
       }
 
       const post = await user.createPost({
-        title: body.title,
-        description: body.description,
-        editable: body.editable,
-        draft: body.draft,
+        title: title,
+        description: description,
+        editable: editable,
+        draft: draft,
       });
 
       res
@@ -77,12 +78,12 @@ class UserController {
   };
 
   getPosts = async (req, res, next) => {
-    const userId = req.data.id;
+    const userId = req.user.id;
     const draft = req.query.draft || false;
 
     try {
       const posts = await Post.findAll({
-        where: { userId: userId, draft: draft },
+        where: { userId, draft },
       });
 
       if (posts.length === 0) {
@@ -101,11 +102,12 @@ class UserController {
   };
 
   updatePost = async (req, res, next) => {
-    const postId = req.query.postId;
-    const userId = req.data.id;
-    const body = req.body;
+    const userId = req.user.id;
     try {
       helper.validateRequest(req);
+
+      const postId = req.query.postId;
+      const { title, description, editable } = req.body;
 
       const post = await Post.findByPk(postId);
 
@@ -121,9 +123,9 @@ class UserController {
         throw error;
       }
 
-      post.title = body.title;
-      post.description = body.description;
-      post.editable = body.editable;
+      post.title = title;
+      post.description = description;
+      post.editable = editable;
 
       const result = await post.save();
 
@@ -137,11 +139,12 @@ class UserController {
   };
 
   deletePost = async (req, res, next) => {
-    const postId = req.query.postId;
-    const userId = req.data.id;
+    const userId = req.user.id;
 
     try {
       helper.validateRequest(req);
+
+      const postId = req.query.postId;
 
       const post = await Post.findByPk(postId);
 
@@ -159,12 +162,16 @@ class UserController {
 
       const result = await post.destroy();
 
-      const deleteComments = await Comment.destroy({
-        where: { postId: postId },
+      await Comment.destroy({
+        where: { postId },
       });
 
-      const deleteLikes = await Like.destroy({
-        where: { postId: postId },
+      await Like.destroy({
+        where: { postId },
+      });
+
+      Collaboration.destroy({
+        where: { postId },
       });
 
       res.status(200).json({ message: "Deleted Post.", data: result });
@@ -176,80 +183,39 @@ class UserController {
     }
   };
 
-  searchItem = async (req, res, next) => {
-    const searchItem = req.query.searchItem;
-    const userId = req.data.id;
+  searchPost = async (req, res, next) => {
+    const userId = req.user.id;
     try {
       helper.validateRequest(req);
 
+      const { searchItem, editable, sortBy, orderBy } = req.query;
+
+      let whereCondition = {
+        userId,
+        draft: false,
+      };
+
+      if (searchItem) {
+        whereCondition[Op.or] = [
+          { title: { [Op.like]: `%${searchItem}%` } },
+          { description: { [Op.like]: `%${searchItem}%` } },
+        ];
+      }
+
+      if (editable) {
+        whereCondition.editable = editable;
+      }
+
+      const order = sortBy ? [[sortBy, orderBy]] : [];
+
       const result = await Post.findAll({
-        where: {
-          [Op.or]: [
-            { title: { [Op.like]: `%${searchItem}%` } },
-            { description: { [Op.like]: `%${searchItem}%` } },
-          ],
-          userId: userId,
-          draft: false,
-        },
+        where: whereCondition,
+        order,
       });
 
       if (result.length === 0) {
         const error = new Error("No result found!");
-        error.statusCode = 404;
-        throw error;
-      }
-
-      res.status(200).json({ message: "Result found.", data: result });
-    } catch (err) {
-      if (!err.statusCode) {
-        err.statusCode = 500;
-      }
-      next(err);
-    }
-  };
-
-  sorting = async (req, res, next) => {
-    const sortBy = req.query.sortBy;
-    const orderBy = req.query.orderBy;
-    const userId = req.data.id;
-
-    try {
-      helper.validateRequest(req);
-
-      const result = await Post.findAll({
-        order: [[sortBy, orderBy]],
-        where: { userId: userId },
-      });
-
-      if (result.length === 0) {
-        const error = new Error("No Result Found!");
-        error.statusCode = 404;
-        throw error;
-      }
-
-      res.status(200).json({ message: "Result found.", data: result });
-    } catch (err) {
-      if (!err.statusCode) {
-        err.statusCode = 500;
-      }
-      next(err);
-    }
-  };
-
-  filter = async (req, res, next) => {
-    const editable = req.query.editable;
-    const userId = req.data.id;
-
-    try {
-      helper.validateRequest(req);
-
-      const result = await Post.findAll({
-        where: { editable: editable, userId: userId },
-      });
-
-      if (result.length === 0) {
-        const error = new Error("No Result Found!");
-        error.statusCode = 404;
+        error.statusCode = 202;
         throw error;
       }
 
@@ -263,11 +229,11 @@ class UserController {
   };
 
   likesUpdate = async (req, res, next) => {
-    const postId = req.body.postId;
-    const userId = req.data.id;
-
+    const userId = req.user.id;
     try {
       helper.validateRequest(req);
+
+      const postId = req.body.postId;
 
       const post = await Post.findByPk(postId);
 
@@ -277,31 +243,26 @@ class UserController {
         throw error;
       }
       const isLike = await Like.findOne({
-        where: { postId: postId, userId: userId },
+        where: { postId, userId },
       });
 
       if (!isLike) {
         const like = await post.createLike({
-          userId: userId,
+          userId,
         });
 
         res
           .status(201)
           .json({ message: "Your like successfully updated.", data: like });
-      } else if (isLike.liked === true) {
-        isLike.liked = false;
-
+      } else {
+        isLike.liked = !isLike.liked;
         const disLike = await isLike.save();
-
-        res.status(200).json({ message: "Disliked Success", data: disLike });
-      } else if (isLike.liked === false) {
-        isLike.liked = true;
-
-        const disLike = await isLike.save();
-
-        res
-          .status(200)
-          .json({ message: "You liked a post again.", data: disLike });
+        res.status(200).json({
+          message: isLike.liked
+            ? "You liked a post again."
+            : "Disliked Success",
+          data: disLike,
+        });
       }
     } catch (err) {
       if (!err.statusCode) {
@@ -312,10 +273,10 @@ class UserController {
   };
 
   getLikes = async (req, res, next) => {
-    const postId = req.query.postId;
-
     try {
       helper.validateRequest(req);
+
+      const postId = req.query.postId;
 
       const post = await Post.findByPk(postId);
 
@@ -328,7 +289,7 @@ class UserController {
       const LikesData = await Like.findAndCountAll({
         where: {
           liked: true,
-          postId: postId,
+          postId,
         },
       });
 
@@ -350,12 +311,11 @@ class UserController {
   };
 
   postComment = async (req, res, next) => {
-    const postId = req.body.postId;
-    const userId = req.data.id;
-    const comment = req.body.comment;
-
+    const userId = req.user.id;
     try {
       helper.validateRequest(req);
+
+      const { postId, comment } = req.body;
 
       const post = await Post.findOne({
         where: { id: postId },
@@ -369,8 +329,8 @@ class UserController {
       }
 
       const data = await post.createComment({
-        comment: comment,
-        userId: userId,
+        comment,
+        userId,
       });
 
       res.status(201).json({ message: "Comment created.", data: data });
@@ -383,10 +343,10 @@ class UserController {
   };
 
   getComment = async (req, res, next) => {
-    const postId = req.query.postId;
-
     try {
       helper.validateRequest(req);
+
+      const postId = req.query.postId;
 
       const post = await Post.findByPk(postId);
 
@@ -397,7 +357,7 @@ class UserController {
       }
 
       const commentData = await Comment.findAndCountAll({
-        where: { postId: postId },
+        where: { postId },
       });
 
       if (commentData.count === 0 && commentData.rows.length === 0) {
@@ -418,11 +378,11 @@ class UserController {
   };
 
   deleteComment = async (req, res, next) => {
-    const commId = req.query.commId;
-    const userId = req.data.id;
-
+    const userId = req.user.id;
     try {
       helper.validateRequest(req);
+
+      const commId = req.query.commId;
 
       const comment = await Comment.findByPk(commId);
 
@@ -450,13 +410,12 @@ class UserController {
   };
 
   postCollaboration = async (req, res, next) => {
-    const userId = req.data.id;
-    const postId = req.query.postId;
-    const body = req.body;
-    const collabId = req.query.collabId;
-
+    const userId = req.user.id;
     try {
       helper.validateRequest(req);
+
+      const { postId, collabId } = req.query;
+      const content = req.body;
 
       const post = await Post.findOne({
         where: { id: postId, editable: true, userId: { [Op.ne]: userId } },
@@ -472,8 +431,8 @@ class UserController {
         const collabQuote = await Collaboration.findOne({
           where: {
             id: collabId,
-            userId: userId,
-            postId: postId,
+            userId,
+            postId,
             status: false,
           },
         });
@@ -484,7 +443,7 @@ class UserController {
           throw error;
         }
 
-        collabQuote.collab_content = body.content;
+        collabQuote.collab_content = content;
 
         const updated = await collabQuote.save();
 
@@ -517,11 +476,11 @@ class UserController {
         );
         const userCollabCount = await Collaboration.findAndCountAll({
           where: {
-            userId: userId, 
-            createdAt: { [Op.gte]: startOfDay }, 
-          }, 
-        }); 
- 
+            userId,
+            createdAt: { [Op.gte]: startOfDay },
+          },
+        });
+
         if (userCollabCount.count >= collabLimit) {
           const error = new Error("Collaboration limit reached for the day!");
           error.statusCode = 403;
@@ -529,8 +488,8 @@ class UserController {
         }
 
         const result = await post.createCollaboration({
-          collab_content: body.content,
-          userId: userId,
+          collab_content: content,
+          userId,
         });
 
         res.status(200).json({
@@ -547,39 +506,182 @@ class UserController {
   };
 
   getCollabQuotes = async (req, res, next) => {
-    const userId = req.data.id;
-    const postId = req.query.postId;
-    const status = req.query.status || false;
-
+    const userId = req.user.id;
     try {
-      if (postId) {
-        const collabList = await Collaboration.findAll({
-          where: { postId: postId, status: status},
-        });
+      const { postId, isOwner, isCollabor } = req.query;
+      const status = req.query.status || false;
 
-        if (collabList.length === 0) {
-          const error = new Error("No Collaboration found!");
-          error.statusCode = 404;
-          throw error;
+      if (isOwner) {
+        if (postId) {
+          const post = await Post.findByPk(postId);
+
+          if (!post) {
+            const error = new Error("Post not Found!");
+            error.statusCode = 404;
+            throw error;
+          }
+
+          if (post.userId === userId) {
+            const collabList = await Collaboration.findAll({
+              where: { postId, status },
+            });
+
+            if (collabList.length === 0) {
+              const error = new Error("No Collaboration found for this post!");
+              error.statusCode = 404;
+              throw error;
+            }
+
+            res.status(200).json({
+              message: "Collaboration list found by postId.",
+              data: collabList,
+            });
+          } else {
+            const error = new Error("You are not eligible for this request!");
+            error.statusCode = 403;
+            throw error;
+          }
+        } else {
+          const collabList = await Collaboration.findAll({
+            where: { status },
+            include: [{ model: Post, where: { userId }, attributes: [] }],
+          });
+
+          if (collabList.length === 0) {
+            const error = new Error("No collab requests found!");
+            error.statusCode = 404;
+            throw error;
+          }
+
+          res
+            .status(200)
+            .json({ message: "Collab requests found.", data: collabList });
         }
+      } else if (isCollabor) {
+        if (postId) {
+          const collabList = await Collaboration.findAll({
+            where: { userId, postId, status },
+          });
 
-        res
-          .status(200)
-          .json({ message: "Collaboration list found by postId.", data: collabList });
+          if (collabList.length === 0) {
+            const error = new Error("You have not collaborated yet!");
+            error.statusCode = 404;
+            throw error;
+          }
+
+          res.status(200).json({
+            message: "Here your collaborated list by postId.",
+            data: collabList,
+          });
+        } else {
+          const collabList = await Collaboration.findAll({
+            where: { userId, status },
+          });
+
+          if (collabList.length === 0) {
+            const error = new Error("You have not collaborated yet!");
+            error.statusCode = 404;
+            throw error;
+          }
+
+          res.status(200).json({
+            message: "Here your all collaborated list.",
+            data: collabList,
+          });
+        }
+      }
+    } catch (err) {
+      if (!err.statusCode) {
+        err.statusCode = 500;
+      }
+      next(err);
+    }
+  };
+
+  DeleteCollab = async (req, res, next) => {
+    const userId = req.user.id;
+    try {
+      helper.validateRequest(req);
+
+      const { postId, collabId } = req.query;
+
+      const post = await Post.findByPk(postId);
+
+      if (!post) {
+        const error = new Error("Post not found!");
+        error.statusCode = 404;
+        throw error;
+      }
+
+      const collab = await Collaboration.findByPk(collabId);
+
+      if (!collab) {
+        const error = new Error("Collab not found!");
+        error.statusCode = 404;
+        throw error;
+      }
+
+      if (post.userId === userId) {
+        const result = await collab.destroy();
+
+        res.status(200).json({ message: "Collab Deleted.", data: result });
+      } else if (collab.userId === userId) {
+        const result = await collab.destroy();
+
+        res.status(200).json({ message: "Collab Deleted.", data: result });
       } else {
-        const collabList = await Collaboration.findAll({
-          where: { userId: userId, status: status },
-        });
+        const error = new Error("You are not eligible person to delete!");
+        error.statusCode = 401;
+        throw error;
+      }
 
-        if (collabList.length === 0) {
-          const error = new Error("No Collaboration found!");
-          error.statusCode = 404;
-          throw error;
-        }
+      console.log(collab.post);
+    } catch (err) {
+      if (!err.statusCode) {
+        err.statusCode = 500;
+      }
+      next(err);
+    }
+  };
+
+  approveCollab = async (req, res, next) => {
+    const userId = req.user.id;
+    
+    try {
+      helper.validateRequest(req);
+
+      const collabId = req.query.collabId;
+
+      const collab = await Collaboration.findByPk(collabId);
+
+      if (!collab) {
+        const error = new Error("Collab not found!");
+        error.statusCode = 404;
+        throw error;
+      }
+
+      const post = await Post.findOne({ where: { id: collab.postId } });
+
+      if (!post) {
+        const error = new Error("Post not found!");
+        error.statusCode = 404;
+        throw error;
+      }
+
+      if (post.userId === userId) {
+        post.description = collab.collab_content;
+        collab.status = true;
+
+        await collab.save();
+        const result = await post.save();
 
         res
           .status(200)
-          .json({ message: "Collaboration list found by user.", data: collabList });
+          .json({ message: "Collab request approved.", data: result });
+      } else {
+        const error = new Error("You are not eligible person to approve!");
+        error.statusCode = 401;
+        throw error;
       }
     } catch (err) {
       if (!err.statusCode) {

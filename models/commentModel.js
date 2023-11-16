@@ -25,4 +25,9 @@ const Comment = sequelize.define(
   }
 );
 
+Comment.associate = (models) => {
+  Comment.belongsTo(models.postModel, { onDelete: "CASCADE" });
+  Comment.belongsTo(models.userModel);
+};
+
 module.exports = Comment;

@@ -25,4 +25,9 @@ const Collaboration = sequelize.define(
   }
 );
 
+Collaboration.associate = (models) => {
+  Collaboration.belongsTo(models.userModel);
+  Collaboration.belongsTo(models.postModel, { onDelete: "CASCADE" });
+};
+
 module.exports = Collaboration;

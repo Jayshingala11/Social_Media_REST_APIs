@@ -1,111 +1,98 @@
 const express = require("express");
-const { body, query } = require("express-validator");
+const UserValidation = require("../utils/validation/userValidation");
+const passport = require("passport");
+const Auth = passport.authenticate("jwt", { session: false });
 
 const userController = require("../controllers/userController");
-const helper = require("../utils/helper");
 
 const router = express.Router();
 
 router.post(
   "/createPost",
-  helper.verifyToken,
-  [
-    body("title").trim().isLength({ min: 5 }),
-    body("description").trim().isLength({ min: 5 }),
-    body("editable").trim().isBoolean(),
-    body("draft").trim().isBoolean(),
-  ],
+  Auth,
+  UserValidation.validateCreatePost,
   userController.createPost
 );
 
-router.get("/getPosts", helper.verifyToken, userController.getPosts);
+router.get("/getPosts", Auth, userController.getPosts);
 
 router.put(
   "/editPost",
-  helper.verifyToken,
-  [
-    body("title").trim().isLength({ min: 5 }),
-    body("description").trim().isLength({ min: 5 }),
-    body("editable").trim().isBoolean(),
-  ],
+  Auth,
+  UserValidation.validateEditPost,
   userController.updatePost
 );
 
 router.delete(
   "/deletePost",
-  helper.verifyToken,
-  [query("postId").isInt().notEmpty()],
+  Auth,
+  UserValidation.validateDeletePost,
   userController.deletePost
 );
 
 router.get(
   "/search",
-  helper.verifyToken,
-  [query("searchItem").notEmpty()],
-  userController.searchItem
-);
-
-router.get(
-  "/sort",
-  helper.verifyToken,
-  [query("sortBy").notEmpty(), query("orderBy").notEmpty()],
-  userController.sorting
-);
-
-router.get(
-  "/filter",
-  helper.verifyToken,
-  [query("editable").isBoolean().notEmpty()],
-  userController.filter
+  Auth,
+  UserValidation.validateSearch,
+  userController.searchPost
 );
 
 router.post(
   "/likes",
-  helper.verifyToken,
-  [body("postId").isInt().notEmpty()],
+  Auth,
+  UserValidation.validateLikes,
   userController.likesUpdate
 );
 
 router.get(
   "/getLikes",
-  helper.verifyToken,
-  [query("postId").isInt().notEmpty()],
+  Auth,
+  UserValidation.validateGetLikes,
   userController.getLikes
 );
 
 router.post(
   "/postComment",
-  helper.verifyToken,
-  [body("postId").isInt().notEmpty(), body("comment").notEmpty()],
+  Auth,
+  UserValidation.validatePostComment,
   userController.postComment
 );
 
 router.get(
   "/getCommnets",
-  helper.verifyToken,
-  [query("postId").isInt().notEmpty()],
+  Auth,
+  UserValidation.validateGetComment,
   userController.getComment
 );
 
 router.delete(
   "/deleteComment",
-  helper.verifyToken,
-  [query("commId").isInt().notEmpty()],
+  Auth,
+  UserValidation.validateDeleteComment,
   userController.deleteComment
 );
 
 router.post(
   "/postCollab",
-  helper.verifyToken,
-  [
-    query("postId").isInt().notEmpty(),
-    body("content").trim().notEmpty(),
-  ],
+  Auth,
+  UserValidation.validatePostCollab,
   userController.postCollaboration
 );
 
-router.get("/getCollabQuotes", helper.verifyToken, userController.getCollabQuotes);
+router.get("/getCollabQuotes", Auth, userController.getCollabQuotes);
 
+router.delete(
+  "/deleteCollabList",
+  Auth,
+  UserValidation.validateDeleteCollab,
+  userController.DeleteCollab
+);
 
+router.put(
+  "/approveCollab",
+  Auth,
+  UserValidation.validateApproveCollab,
+  userController.approveCollab
+);
 
 module.exports = router;
