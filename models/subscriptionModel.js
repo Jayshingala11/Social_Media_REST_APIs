@@ -9,15 +9,26 @@ const Subscription = sequelize.define("subscription", {
     allowNull: false,
     primaryKey: true,
   },
-  plan_name: {
+  sub_id: {
     type: Sequelize.STRING,
+    allowNull: false,
   },
-  posts_limit: {
-    type: Sequelize.INTEGER,
+  active: {
+    type: Sequelize.BOOLEAN,
+    allowNull: false,
   },
-  collab_limit: {
-    type: Sequelize.INTEGER,
+  start_date: {
+    type: Sequelize.DATE,
+  },
+  end_date: {
+    type: Sequelize.DATE,
   },
 });
+
+Subscription.associate = (models) => {
+  Subscription.belongsTo(models.customerModel);
+  Subscription.belongsTo(models.subscriptionplanModel);
+  Subscription.belongsTo(models.userModel);
+};
 
 module.exports = Subscription;

@@ -1,0 +1,246 @@
+<main>
+
+  <h2 class="mb-4" data-senderId="{{user.id}}" data-planName="{{user.subscriptionplan.plan_name}}">Hii {{user.name}}</h2>
+
+  <div class="row">
+    <div class="col-md-4">
+      <ul class="list-group">
+        {{#if users.length}}
+          {{#each users}}
+            <li class="list-group-item list-group-item-dark cursor-pointer user-list" data-receiverId="{{this.dataValues.id}}">
+              {{ this.dataValues.name }}
+
+            {{#if (eq this.dataValues.status "1")}}
+                <sup class="online-status" id="{{this.dataValues.id}}-status">Online</sup>
+            {{else}}
+                <sup class="offline-status" id="{{this.dataValues.id}}-status">Offline</sup>
+            {{/if}}
+
+            </li>
+          {{/each}}
+        {{/if}}
+      </ul>
+    </div>
+    <div class="col-md-8">
+        <h3 class="start-head">Click to Start the Chat</h3>
+        <div class="chat-section">
+            <div id="chat-container">
+              
+            </div>
+            <form action="" id="chat-form">
+                <input type="text" name="message" placeholder="Enter Message" id="message" class="border" required>
+                <button type="submit" value="Send Message" class="btn btn-primary" id="SendMessage">Send Message</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add this modal at the end of your HTML body -->
+    <div class="modal fade" id="requestStatusModal" tabindex="-1" role="dialog" aria-labelledby="requestStatusModalLabel" aria-hidden="true">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="requestStatusModalLabel">Request Status</h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <p>Your message request is pending. The user has not accepted it yet.</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add this modal at the end of your HTML body -->
+    <div class="modal fade" id="messageRequestModal" tabindex="-1" role="dialog" aria-labelledby="messageRequestModalLabel" aria-hidden="true">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="messageRequestModalLabel">Message Request</h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <p>You have a pending message request. Do you want to accept it?</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary" id="acceptRequestBtn">Accept</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+  </div>
+
+  <script>
+    const $ = jQuery.noConflict();
+
+    const senderId = $('h2').attr("data-senderId");
+    console.log("SenderId :::", senderId);  
+    const currentUserPlan = $('h2').attr("data-planName");
+    let receiverId;
+    let req_status = false;
+
+    const socket = io('/user-namespace', {
+        auth: {
+            token: senderId
+        }
+    });
+
+    $(document).ready(function(){
+        $('.user-list').click(function(){
+          if (currentUserPlan === 'Basic') {
+            alert("If you want to access then buy our standard or premium plan");
+            return;
+          }
+          let userId = $(this).attr('data-receiverId');
+          receiverId = userId;
+          console.log("receivedId :::", receiverId);
+            $('.start-head').hide();
+            $('.chat-section').show();
+
+          socket.emit('existsChat', { senderId, receiverId });
+        });
+    });
+
+
+    // update user online    
+    socket.on('getOnlineUser', function(data) {
+        console.log('Received getOnlineUser event:', data.users[0].id);
+        const users = data.users;
+        for (let i = 0; i < users.length; i++) {
+          updateUserStatus(users[i].id, 'Online');
+        }
+    });
+
+    // update user offline
+    socket.on('getOfflineUser', function(data) {
+        console.log('Received getOfflineUser event:', data);
+        const users = data.users;
+        for (let i = 0; i < users.length; i++) {
+          updateUserStatus(users[i].id, 'Offline');
+        }
+        // updateUserStatus(data.userId, 'Offline');
+    });
+
+    function updateUserStatus(userId, status) {
+        console.log('Updating status for user', userId, 'to', status);
+        $('#' + userId + '-status').text(status);
+        if (status === 'Online') {
+        $('#' + userId + '-status').removeClass('offline-status').addClass('online-status');
+        } else {
+        $('#' + userId + '-status').removeClass('online-status').addClass('offline-status');
+        }
+    }
+
+
+    $(document).ready(function () {
+      $('#SendMessage').click(function(event) {
+        event.preventDefault();
+
+        let message = $('#message').val();
+        if (currentUserPlan === 'Premium') {
+          req_status = true;
+        }
+
+        $.ajax({
+          url: '/saveChat',
+          type: 'POST',
+          data: {
+            senderId,
+            receiverId,
+            message,
+            req_status
+          },
+          success: function(response)  {
+            if(response.success) {
+              console.log("Data :::", response)
+              $('#message').val('');
+              let chat = response.data.message;
+              let html = `
+              <div class="current-user-chat">
+                  <h5>${chat}</h5>
+              </div>
+              `;
+              $('#chat-container').append(html);
+              socket.emit('newChat', response.data);
+              if (response.data.req_status === false) {
+                $('#requestStatusModal').modal('show');
+              }
+              scrollChat();
+            }else {
+              alert(response.msg)
+            }
+          },
+          error: function(error)  {
+            console.error("Ajax Error:", error.message);
+          }
+        });
+      });
+    });
+
+
+    socket.on('loadNewChat', function(data) {
+      if(senderId === data.receiver_id && receiverId === data.sender_id) {
+        let html = `
+          <div class="distance-user-chat">
+              <h5>${data.message}</h5>
+          </div>
+          `;
+        $('#chat-container').append(html);
+      }
+      scrollChat();
+    });
+
+    socket.on('loadOldChat', function(data) {
+      $('#chat-container').html('');
+      const chats = data.chats;
+      let html = '';
+
+      for(let i = 0; i < chats.length; i++) {
+        req_status = true;
+        let addClass = '';
+        if (chats[i]['sender_id'] == senderId) {
+          addClass = 'current-user-chat';
+        }
+        else {
+          addClass = 'distance-user-chat';
+        }
+
+        html += `
+          <div class="${addClass}">
+              <h5>${chats[i]['message']}</h5>
+          </div>
+        `;
+      }
+      $('#chat-container').append(html);
+      scrollChat();
+    });
+
+    socket.on('messageReqStatus', function(data) {
+      $('#messageRequestModal').modal('show');
+    });
+
+    $(document).ready(function() {
+      $('#acceptRequestBtn').click(function(event) {
+        event.preventDefault();
+        req_status = true;
+        socket.emit('updateReqStatus', { senderId, receiverId, req_status});
+        $('#messageRequestModal').modal('hide');
+      })
+    });
+
+    function scrollChat() {
+      $('#chat-container').animate({
+        scrollTop:$('#chat-container').offset().top + $('#chat-container')[0].scrollHeight
+      }, 0);
+    }
+  </script>
+
+</main>

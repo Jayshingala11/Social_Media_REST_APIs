@@ -3,7 +3,9 @@ const Post = require("../models/postModel");
 const User = require("../models/userModel");
 const Comment = require("../models/commentModel");
 const helper = require("../utils/helper");
-const Subscription = require("../models/subscriptionModel");
+const SubscriptionPlan = require("../models/subscriptionplanModel");
+
+const io = require("../app");
 
 const { Op } = require("sequelize");
 const Collaboration = require("../models/collaborationModel");
@@ -18,11 +20,13 @@ class UserController {
 
       const user = await User.findOne({
         where: { id: userId },
-        include: Subscription,
+        include: SubscriptionPlan,
       });
 
-      const maxPostsLimit = user.subscription.posts_limit;
-      const userPlan = user.subscription.plan_name;
+      console.log("User :::", user.subscriptionplan.posts_limit);
+
+      const maxPostsLimit = user.subscriptionplan.posts_limit;
+      const userPlan = user.subscriptionplan.plan_name;
 
       if (userPlan === "Basic") {
         const { count } = await Post.findAndCountAll({
@@ -451,11 +455,11 @@ class UserController {
       } else {
         const user = await User.findOne({
           where: { id: userId },
-          include: Subscription,
+          include: SubscriptionPlan,
         });
 
-        const collabLimit = user.subscription.collab_limit;
-        const userPlan = user.subscription.plan_name;
+        const collabLimit = user.subscriptionplan.collab_limit;
+        const userPlan = user.subscriptionplan.plan_name;
 
         if (userPlan === "Basic") {
           const error = new Error(
@@ -646,7 +650,7 @@ class UserController {
 
   approveCollab = async (req, res, next) => {
     const userId = req.user.id;
-    
+
     try {
       helper.validateRequest(req);
 

@@ -27,10 +27,8 @@ router.post(
 
 router.post("/addSubscriptionPlan", authController.addSubscriptionPlan);
 
-router.post("/interest", authController.calculateInterest);
+router.post("/checkOut", Auth, authController.checkOut);
 
-router.post("/addLoan", authController.addLoan);
-
-router.post("/changeLoan", authController.changeLoan);
+router.get("/success", authController.success);
 
 module.exports = router;

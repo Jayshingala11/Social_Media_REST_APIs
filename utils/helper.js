@@ -1,6 +1,6 @@
+require("dotenv").config();
 var jwt = require("jsonwebtoken");
-const secret =
-  "DHJWKJSBVKDISDBVJEWJSDHJDSHFJLSDHVJEWBGJDSUIEBF13UHUEUFHWE18HUEWHUE83HDODJVJXZ";
+const secret = process.env.JWT_SECRET;
 const nodemailer = require("nodemailer");
 const sendgridTrasport = require("nodemailer-sendgrid-transport");
 const { validationResult } = require("express-validator");
@@ -14,8 +14,7 @@ const ExtractJwt = require("passport-jwt").ExtractJwt;
 const transporter = nodemailer.createTransport(
   sendgridTrasport({
     auth: {
-      api_key:
-        "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",
+      api_key: process.env.NODEMAILER_API_KEY,
     },
   })
 );
@@ -136,7 +135,9 @@ class Helper {
   };
 
   getDaysDifference = async (date1, date2) => {
-    const daysDifference = Math.floor((date1 - date2) / (1000 * 60 * 60 * 24) + 1);
+    const daysDifference = Math.floor(
+      (date1 - date2) / (1000 * 60 * 60 * 24) + 1
+    );
 
     return daysDifference;
   };

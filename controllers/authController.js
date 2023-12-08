@@ -1,9 +1,13 @@
+require("dotenv").config();
 const bcrypt = require("bcrypt");
 const helper = require("../utils/helper");
 const models = require("../models/indexModel");
 const User = models.userModel;
 const Subscription = models.subscriptionModel;
-const Interest = models.interestModel;
+const SubscriptionPlan = models.subscriptionplanModel;
+const Customer = models.customerModel;
+
+const stripe = require("stripe")(process.env.STRIPE_API_KEY);
 
 const { Op } = require("sequelize");
 
@@ -20,7 +24,7 @@ class AuthController {
         email: body.email,
         password: hashedPassword,
         status: "false",
-        subscriptionId: body.subId || 1,
+        subscriptionplanId: body.subPlanId || 1,
       });
 
       const result = await user.save();
@@ -102,7 +106,7 @@ class AuthController {
         name: user.name,
       };
 
-      const token = await helper.generateToken(userObj, "1h");
+      const token = await helper.generateToken(userObj, "3h");
 
       res
         .status(200)
@@ -191,7 +195,8 @@ class AuthController {
     const body = req.body;
 
     try {
-      const subPlan = new Subscription({
+      const subPlan = new SubscriptionPlan({
+        product_id: body.productId || null,
         plan_name: body.name,
         posts_limit: body.postLimit,
         collab_limit: body.collabLimit,
@@ -202,6 +207,113 @@ class AuthController {
       res
         .status(201)
         .json({ message: "Subscription plan Created.", data: result });
+    } catch (err) {
+      if (!err.statusCode) {
+        err.statusCode = 500;
+      }
+      next(err);
+    }
+  };
+
+  checkOut = async (req, res, next) => {
+    const userId = req.user.id;
+    const price = req.body.price;
+    try {
+      const user = await User.findByPk(userId);
+
+      const cust = await Customer.findOne({ where: { userId } });
+
+      let customer_id;
+      if (cust) {
+        customer_id = cust.customer_id;
+      }
+
+      let customer;
+      if (!cust) {
+        customer = await stripe.customers.create({
+          email: user.email,
+          name: user.name,
+        });
+
+        customer_id = customer.id;
+
+        await Customer.create({
+          customer_id: customer.id,
+          userId,
+        });
+      }
+
+      const subscription = await Subscription.findOne({ where: { userId } });
+
+      if (subscription) {
+        const error = new Error("You already have a subscription!");
+        error.statusCode = 403;
+        throw error;
+      }
+
+      const session = await stripe.checkout.sessions.create({
+        customer: customer_id,
+        payment_method_types: ["card"],
+        line_items: [
+          {
+            price,
+            quantity: 1,
+          },
+        ],
+        mode: "subscription",
+        success_url:
+          "http://localhost:3000/auth/success?session_id={CHECKOUT_SESSION_ID}",
+        cancel_url: "http://localhost:3000/cancel",
+        metadata: {
+          userId,
+        },
+      });
+
+      res.status(200).json({ message: "Checkout", data: session });
+    } catch (err) {
+      if (!err.statusCode) {
+        err.statusCode = 500;
+      }
+      next(err);
+    }
+  };
+
+  success = async (req, res, next) => {
+    try {
+      const session = await stripe.checkout.sessions.retrieve(
+        req.query.session_id
+      );
+
+      const subscription = await stripe.subscriptions.retrieve(
+        session.subscription
+      );
+
+      const start_date = new Date(subscription.current_period_start * 1000);
+      const end_date = new Date(subscription.current_period_end * 1000);
+
+      const customerTable = await Customer.findOne({
+        where: { customer_id: subscription.customer },
+      });
+      const subPlanTable = await SubscriptionPlan.findOne({
+        where: { product_id: subscription.plan.product },
+      });
+
+      await Subscription.create({
+        sub_id: subscription.id,
+        active: subscription.plan.active,
+        start_date,
+        end_date,
+        customerId: customerTable.id,
+        subscriptionplanId: subPlanTable.id,
+        userId: session.metadata.userId,
+      });
+
+      await User.update(
+        { subscriptionplanId: subPlanTable.id },
+        { where: { id: session.metadata.userId } }
+      );
+
+      res.json({ message: "Subscription Success" });
     } catch (err) {
       if (!err.statusCode) {
         err.statusCode = 500;
