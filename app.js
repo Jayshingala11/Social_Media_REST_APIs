@@ -74,6 +74,8 @@ usp.on("connection", async (socket) => {
       } else {
         socket.emit("loadOldChat", { chats });
       }
+    } else {
+      socket.emit("loadOldChat", { chats });
     }
   });
 
