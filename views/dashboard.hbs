@@ -201,7 +201,6 @@
     socket.on('loadOldChat', function(data) {
       $('#chat-container').html('');
       const chats = data.chats;
-      console.log("Chats ::: ", chats);
       let html = '';
 
       for(let i = 0; i < chats.length; i++) {

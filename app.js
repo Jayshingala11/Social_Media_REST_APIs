@@ -69,8 +69,8 @@ usp.on("connection", async (socket) => {
     });
 
     if (chats.length !== 0) {
-      if (chats[0].req_status === false) {
-        socket.emit("messageReqStatus", chats[0].req_status);
+      if (chats[0].req_status === false && chats[0].sender_id != data.senderId) {
+        socket.emit("messageReqStatus", chats[0]);
       } else {
         socket.emit("loadOldChat", { chats });
       }
